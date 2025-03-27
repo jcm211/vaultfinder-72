@@ -42,8 +42,8 @@ const Login = () => {
         navigate("/admin");
       } else {
         toast({
-          title: "Login Failed",
-          description: "Invalid username or password.",
+          title: "Access Denied",
+          description: "Authentication failed. Please verify your credentials.",
           variant: "destructive",
         });
       }

@@ -15,8 +15,8 @@ interface AuthContextType {
 }
 
 const defaultAdminCredentials = {
-  username: "admin",
-  password: "admin123",
+  username: "MWTINC",
+  password: "JC222@Vemous$24",
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
