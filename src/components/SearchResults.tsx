@@ -1,21 +1,51 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useSearch, SearchResult } from "@/context/SearchContext";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Globe } from "lucide-react";
+import { Globe, ArrowDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const SearchResults = () => {
-  const { results, isLoading, query } = useSearch();
+  const { results, isLoading, query, infiniteSearch, hasMoreResults, currentPage } = useSearch();
   const resultsRef = useRef<HTMLDivElement>(null);
+  const loadingMoreRef = useRef<HTMLDivElement>(null);
+
+  // Handle infinite scroll
+  const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
+    const [entry] = entries;
+    if (entry.isIntersecting && !isLoading && hasMoreResults) {
+      infiniteSearch(currentPage + 1);
+    }
+  }, [infiniteSearch, currentPage, isLoading, hasMoreResults]);
+
+  // Set up intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(handleObserver, {
+      root: null,
+      rootMargin: '0px',
+      threshold: 1.0
+    });
+    
+    if (loadingMoreRef.current) {
+      observer.observe(loadingMoreRef.current);
+    }
+    
+    return () => {
+      if (loadingMoreRef.current) {
+        observer.unobserve(loadingMoreRef.current);
+      }
+    };
+  }, [handleObserver, results.length]);
 
   useEffect(() => {
-    // Scroll to top when results change
-    if (resultsRef.current) {
+    // Scroll to top when new search is performed
+    if (resultsRef.current && results.length === 0) {
       resultsRef.current.scrollTop = 0;
     }
-  }, [results]);
+  }, [query]);
 
-  if (isLoading) {
+  // Loading state for initial search
+  if (isLoading && results.length === 0) {
     return (
       <div className="w-full max-w-3xl mx-auto py-4 animate-fade-in">
         <div className="mb-6">
@@ -62,6 +92,38 @@ const SearchResults = () => {
           <ResultItem key={result.id} result={result} />
         ))}
       </div>
+      
+      {/* Load more section */}
+      {results.length > 0 && (
+        <div 
+          ref={loadingMoreRef} 
+          className="py-8 text-center"
+        >
+          {isLoading && (
+            <div className="flex flex-col items-center">
+              <Skeleton className="h-10 w-32 rounded-full mb-2" />
+              <Skeleton className="h-4 w-40" />
+            </div>
+          )}
+          
+          {!isLoading && hasMoreResults && (
+            <Button 
+              variant="outline" 
+              onClick={() => infiniteSearch(currentPage + 1)}
+              className="flex items-center gap-2"
+            >
+              <ArrowDown className="h-4 w-4" />
+              <span>Load more results</span>
+            </Button>
+          )}
+          
+          {!isLoading && !hasMoreResults && results.length > 0 && (
+            <p className="text-sm text-gray-500">
+              End of results for "{query}"
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 };

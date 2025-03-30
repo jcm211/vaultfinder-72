@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { toast } from "@/components/ui/use-toast";
 
 interface User {
   username: string;
@@ -49,9 +50,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(user);
       setIsAuthenticated(true);
       localStorage.setItem("user", JSON.stringify(user));
+      toast({
+        title: "Login successful",
+        description: "Welcome back, administrator."
+      });
       return true;
     }
 
+    toast({
+      title: "Login failed",
+      description: "Invalid username or password. Please try again.",
+      variant: "destructive"
+    });
     return false;
   };
 
@@ -59,30 +69,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem("user");
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out."
+    });
   };
 
   const resetSystem = async (): Promise<boolean> => {
     // Simulate system reset
     await new Promise((resolve) => setTimeout(resolve, 1500));
     
-    // Clear stored settings
-    localStorage.removeItem("firewallSettings");
-    localStorage.removeItem("searchSettings");
-    localStorage.removeItem("searchHistory");
-    localStorage.removeItem("mapbox_token");
-    
-    // Re-initialize with defaults
-    const defaultFirewallSettings = {
-      enabled: true,
-      blockUnauthorizedIps: true,
-      allowedDomains: ["*.google.com", "*.bing.com", "*.duckduckgo.com"],
-      blockWords: ["malware", "phishing", "exploit"],
-      securityLevel: "medium",
-    };
-    
-    localStorage.setItem("firewallSettings", JSON.stringify(defaultFirewallSettings));
-    
-    return true;
+    try {
+      // Backup mapbox token if it exists
+      const mapboxToken = localStorage.getItem("mapbox_token");
+      
+      // Clear stored settings
+      localStorage.removeItem("firewallSettings");
+      localStorage.removeItem("searchSettings");
+      localStorage.removeItem("searchHistory");
+      
+      // Restore mapbox token if it existed
+      if (mapboxToken) {
+        localStorage.setItem("mapbox_token", mapboxToken);
+      }
+      
+      // Re-initialize with defaults
+      const defaultFirewallSettings = {
+        enabled: true,
+        blockUnauthorizedIps: true,
+        allowedDomains: ["*.google.com", "*.bing.com", "*.duckduckgo.com"],
+        blockWords: ["malware", "phishing", "exploit"],
+        securityLevel: "medium",
+      };
+      
+      localStorage.setItem("firewallSettings", JSON.stringify(defaultFirewallSettings));
+      
+      toast({
+        title: "System reset successful",
+        description: "All settings have been reset to their default values."
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Reset failed:", error);
+      toast({
+        title: "System reset failed",
+        description: "There was an error resetting the system. Please try again.",
+        variant: "destructive"
+      });
+      return false;
+    }
   };
 
   return (
