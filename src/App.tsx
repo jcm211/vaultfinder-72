@@ -7,10 +7,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { AuthProvider } from "./context/AuthContext";
 import { SearchProvider } from "./context/SearchContext";
+import { SecurityProvider } from "./context/SecurityContext";
 import Index from "./pages/Index";
 import Results from "./pages/Results";
 import Admin from "./pages/Admin";
 import FirewallConfig from "./pages/FirewallConfig";
+import SecurityConfig from "./pages/SecurityConfig";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -40,22 +42,25 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <SearchProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/results" element={<Results />} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="/admin/firewall" element={<FirewallConfig />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </SearchProvider>
+        <SecurityProvider>
+          <SearchProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/results" element={<Results />} />
+                  <Route path="/admin" element={<Admin />} />
+                  <Route path="/admin/firewall" element={<FirewallConfig />} />
+                  <Route path="/admin/security" element={<SecurityConfig />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </SearchProvider>
+        </SecurityProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

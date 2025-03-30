@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 
 interface User {
   username: string;
@@ -87,6 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem("firewallSettings");
       localStorage.removeItem("searchSettings");
       localStorage.removeItem("searchHistory");
+      localStorage.removeItem("securitySettings");
       
       // Restore mapbox token if it existed
       if (mapboxToken) {
@@ -102,7 +103,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         securityLevel: "medium",
       };
       
+      const defaultSecuritySettings = {
+        malwareProtectionEnabled: true,
+        intrusionDetectionEnabled: true,
+        lastScanTime: null,
+        threatLevel: "low",
+        securityLog: [],
+        blockedAttempts: 0,
+      };
+      
       localStorage.setItem("firewallSettings", JSON.stringify(defaultFirewallSettings));
+      localStorage.setItem("securitySettings", JSON.stringify(defaultSecuritySettings));
       
       toast({
         title: "System reset successful",
