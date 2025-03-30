@@ -69,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem("firewallSettings");
     localStorage.removeItem("searchSettings");
     localStorage.removeItem("searchHistory");
+    localStorage.removeItem("mapbox_token");
     
     // Re-initialize with defaults
     const defaultFirewallSettings = {
