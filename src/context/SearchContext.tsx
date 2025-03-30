@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useSecurity } from "@/context/SecurityContext";
@@ -9,6 +10,7 @@ export interface SearchResult {
   description: string;
   favicon?: string;
   date?: string;
+  source?: "google" | "bing" | "duckduckgo";
 }
 
 interface SearchContextType {
@@ -22,6 +24,12 @@ interface SearchContextType {
   infiniteSearch: (page: number) => Promise<void>;
   hasMoreResults: boolean;
   currentPage: number;
+  searchEngines: {
+    google: boolean;
+    bing: boolean;
+    duckduckgo: boolean;
+  };
+  toggleSearchEngine: (engine: "google" | "bing" | "duckduckgo") => void;
 }
 
 interface FirewallSettings {
@@ -48,6 +56,11 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
   const [hasMoreResults, setHasMoreResults] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchEngines, setSearchEngines] = useState({
+    google: true,
+    bing: true,
+    duckduckgo: true
+  });
   
   const { isContentSafe, isUrlSafe } = useSecurity();
 
@@ -71,13 +84,51 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } else {
       localStorage.setItem("firewallSettings", JSON.stringify(firewallSettings));
     }
+    
+    // Load saved search engine preferences
+    const savedSearchEngines = localStorage.getItem("searchEngines");
+    if (savedSearchEngines) {
+      try {
+        setSearchEngines(JSON.parse(savedSearchEngines));
+      } catch (error) {
+        console.error("Failed to parse search engines:", error);
+      }
+    } else {
+      localStorage.setItem("searchEngines", JSON.stringify(searchEngines));
+    }
   }, []);
 
   useEffect(() => {
     localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
   }, [searchHistory]);
+  
+  useEffect(() => {
+    localStorage.setItem("searchEngines", JSON.stringify(searchEngines));
+  }, [searchEngines]);
 
-  const generateResultsForPage = useCallback(async (searchQuery: string, page: number): Promise<SearchResult[]> => {
+  const toggleSearchEngine = useCallback((engine: "google" | "bing" | "duckduckgo") => {
+    setSearchEngines(prev => {
+      // Ensure at least one engine is enabled
+      const wouldAllBeDisabled = Object.entries(prev)
+        .filter(([key]) => key !== engine)
+        .every(([_, value]) => !value);
+      
+      if (prev[engine] && wouldAllBeDisabled) {
+        toast({
+          title: "Action not allowed",
+          description: "At least one search engine must remain enabled.",
+          variant: "destructive"
+        });
+        return prev;
+      }
+      
+      const newState = { ...prev, [engine]: !prev[engine] };
+      localStorage.setItem("searchEngines", JSON.stringify(newState));
+      return newState;
+    });
+  }, []);
+
+  const generateResultsForPage = useCallback(async (searchQuery: string, page: number, sourceEngine: "google" | "bing" | "duckduckgo"): Promise<SearchResult[]> => {
     const isQuerySafe = await isContentSafe(searchQuery);
     
     if (!isQuerySafe) {
@@ -104,7 +155,11 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
     
-    const pageSeed = (searchQuery.length * 7 + page * 13) % 100;
+    // Different seed for each search engine to ensure variety
+    let pageSeed = (searchQuery.length * 7 + page * 13) % 100;
+    
+    if (sourceEngine === "bing") pageSeed = (pageSeed + 33) % 100;
+    if (sourceEngine === "duckduckgo") pageSeed = (pageSeed + 66) % 100;
     
     const domains = [
       "example.com", 
@@ -135,9 +190,18 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       let titlePrefix = "";
       let descPrefix = "";
       
+      // Different prefixes for different engines to make results distinguishable
+      if (sourceEngine === "google") {
+        titlePrefix = page > 1 ? "Google: " : "";
+      } else if (sourceEngine === "bing") {
+        titlePrefix = page > 1 ? "Bing: " : "";
+      } else {
+        titlePrefix = page > 1 ? "DuckDuckGo: " : "";
+      }
+      
       if (page > 1) {
         const prefixes = ["Advanced", "Detailed", "Complete", "Professional", "Expert"];
-        titlePrefix = prefixes[(pageSeed + i) % prefixes.length] + " ";
+        titlePrefix += prefixes[(pageSeed + i) % prefixes.length] + " ";
         
         const descPrefixes = [
           "In-depth analysis of ",
@@ -154,12 +218,13 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const dateStr = date.toISOString().split('T')[0];
       
       pageResults.push({
-        id: `${page}-${resultId}`,
+        id: `${sourceEngine}-${page}-${resultId}`,
         title: `${titlePrefix}${searchQuery} - Result ${resultId} | ${domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1)}`,
         url,
         description: `${descPrefix}${searchQuery}. This is result #${resultId} with specific information tailored to your search query. Learn more about ${searchQuery} and related topics.`,
         favicon: `https://www.${domain.split(".")[0]}.${domain.split(".")[1]}/favicon.ico`,
-        date: dateStr
+        date: dateStr,
+        source: sourceEngine
       });
     }
     
@@ -193,8 +258,38 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       await new Promise(resolve => setTimeout(resolve, 1200));
       
-      const searchResults = await generateResultsForPage(searchQuery, 1);
-      setResults(searchResults);
+      const allResults: SearchResult[] = [];
+      
+      // Search with all enabled engines
+      const searchPromises: Promise<SearchResult[]>[] = [];
+      
+      if (searchEngines.google) {
+        searchPromises.push(generateResultsForPage(searchQuery, 1, "google"));
+      }
+      
+      if (searchEngines.bing) {
+        searchPromises.push(generateResultsForPage(searchQuery, 1, "bing"));
+      }
+      
+      if (searchEngines.duckduckgo) {
+        searchPromises.push(generateResultsForPage(searchQuery, 1, "duckduckgo"));
+      }
+      
+      const resultsFromAllEngines = await Promise.all(searchPromises);
+      
+      // Combine and interleave results from all engines
+      resultsFromAllEngines.forEach(engineResults => {
+        allResults.push(...engineResults);
+      });
+      
+      // Sort results - this can be customized based on preferences
+      const sortedResults = allResults.sort((a, b) => {
+        // First sort by "relevance" which we'll simulate by adding a small random factor
+        const randomFactor = Math.random() * 0.2 - 0.1; // ±10% randomness
+        return randomFactor;
+      });
+      
+      setResults(sortedResults);
       setHasMoreResults(true);
     } catch (error) {
       console.error("Search failed:", error);
@@ -208,7 +303,7 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally {
       setIsLoading(false);
     }
-  }, [searchHistory, generateResultsForPage]);
+  }, [searchHistory, searchEngines, generateResultsForPage]);
 
   const infiniteSearch = useCallback(async (page: number): Promise<void> => {
     if (page <= currentPage || isLoading) return;
@@ -218,13 +313,35 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      const newResults = await generateResultsForPage(query, page);
+      const allNewResults: SearchResult[] = [];
+      const searchPromises: Promise<SearchResult[]>[] = [];
       
-      if (page >= 5 || newResults.length === 0) {
+      // Get more results from all enabled engines
+      if (searchEngines.google) {
+        searchPromises.push(generateResultsForPage(query, page, "google"));
+      }
+      
+      if (searchEngines.bing) {
+        searchPromises.push(generateResultsForPage(query, page, "bing"));
+      }
+      
+      if (searchEngines.duckduckgo) {
+        searchPromises.push(generateResultsForPage(query, page, "duckduckgo"));
+      }
+      
+      const resultsFromAllEngines = await Promise.all(searchPromises);
+      
+      resultsFromAllEngines.forEach(engineResults => {
+        allNewResults.push(...engineResults);
+      });
+      
+      if (page >= 5 || allNewResults.length === 0) {
         setHasMoreResults(false);
       }
       
-      setResults(prev => [...prev, ...newResults]);
+      // Sort and add the new results
+      const sortedNewResults = allNewResults.sort(() => Math.random() - 0.5);
+      setResults(prev => [...prev, ...sortedNewResults]);
       setCurrentPage(page);
     } catch (error) {
       console.error("Infinite search failed:", error);
@@ -236,7 +353,7 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, isLoading, query, generateResultsForPage]);
+  }, [currentPage, isLoading, query, searchEngines, generateResultsForPage]);
 
   const clearHistory = useCallback(() => {
     setSearchHistory([]);
@@ -259,7 +376,9 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         clearHistory,
         infiniteSearch,
         hasMoreResults,
-        currentPage
+        currentPage,
+        searchEngines,
+        toggleSearchEngine
       }}
     >
       {children}

@@ -2,11 +2,13 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useSearch, SearchResult } from "@/context/SearchContext";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Globe, ArrowDown } from "lucide-react";
+import { Globe, ArrowDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const SearchResults = () => {
-  const { results, isLoading, query, infiniteSearch, hasMoreResults, currentPage } = useSearch();
+  const { results, isLoading, query, infiniteSearch, hasMoreResults, currentPage, searchEngines, toggleSearchEngine } = useSearch();
   const resultsRef = useRef<HTMLDivElement>(null);
   const loadingMoreRef = useRef<HTMLDivElement>(null);
 
@@ -83,9 +85,70 @@ const SearchResults = () => {
 
   return (
     <div ref={resultsRef} className="w-full max-w-3xl mx-auto">
-      <p className="text-sm text-gray-500 mb-4">
-        {results.length} results for "{query}"
-      </p>
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
+        <p className="text-sm text-gray-500 mb-2 md:mb-0">
+          {results.length} results for "{query}"
+        </p>
+        
+        <div className="flex flex-wrap gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant={searchEngines.google ? "default" : "outline"}
+                  className="flex items-center gap-1 h-8"
+                  onClick={() => toggleSearchEngine("google")}
+                >
+                  {searchEngines.google && <Check className="h-3.5 w-3.5" />}
+                  <span>Google</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {searchEngines.google ? "Disable Google search" : "Enable Google search"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant={searchEngines.bing ? "default" : "outline"}
+                  className="flex items-center gap-1 h-8"
+                  onClick={() => toggleSearchEngine("bing")}
+                >
+                  {searchEngines.bing && <Check className="h-3.5 w-3.5" />}
+                  <span>Bing</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {searchEngines.bing ? "Disable Bing search" : "Enable Bing search"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant={searchEngines.duckduckgo ? "default" : "outline"}
+                  className="flex items-center gap-1 h-8"
+                  onClick={() => toggleSearchEngine("duckduckgo")}
+                >
+                  {searchEngines.duckduckgo && <Check className="h-3.5 w-3.5" />}
+                  <span>DuckDuckGo</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {searchEngines.duckduckgo ? "Disable DuckDuckGo search" : "Enable DuckDuckGo search"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
       
       <div className="space-y-6">
         {results.map((result) => (
@@ -129,6 +192,15 @@ const SearchResults = () => {
 };
 
 const ResultItem = ({ result }: { result: SearchResult }) => {
+  const sourceColors = {
+    google: "bg-blue-50 text-blue-600 border-blue-200",
+    bing: "bg-teal-50 text-teal-600 border-teal-200",
+    duckduckgo: "bg-orange-50 text-orange-600 border-orange-200"
+  };
+  
+  const sourceLabel = result.source || "unknown";
+  const sourceColor = result.source ? sourceColors[result.source] : "bg-gray-50 text-gray-600 border-gray-200";
+  
   return (
     <div className="group animate-fade-in">
       <div className="flex items-start">
@@ -146,30 +218,38 @@ const ResultItem = ({ result }: { result: SearchResult }) => {
         )}
         
         <div className="flex-1">
-          <a 
-            href={result.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block"
-          >
-            <h3 className="text-lg font-medium text-primary group-hover:underline mb-1">
-              {result.title}
-            </h3>
+          <div className="flex items-center gap-2 mb-1">
+            <a 
+              href={result.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block flex-1"
+            >
+              <h3 className="text-lg font-medium text-primary group-hover:underline">
+                {result.title}
+              </h3>
+            </a>
             
-            <div className="flex items-center text-sm text-gray-500 mb-1">
-              <span className="truncate">{result.url}</span>
-              {result.date && (
-                <>
-                  <span className="mx-2">•</span>
-                  <span>{result.date}</span>
-                </>
-              )}
-            </div>
+            {result.source && (
+              <Badge variant="outline" className={`text-xs px-2 py-0 h-5 ${sourceColor}`}>
+                {sourceLabel}
+              </Badge>
+            )}
+          </div>
             
-            <p className="text-gray-700 text-sm">
-              {result.description}
-            </p>
-          </a>
+          <div className="flex items-center text-sm text-gray-500 mb-1">
+            <span className="truncate">{result.url}</span>
+            {result.date && (
+              <>
+                <span className="mx-2">•</span>
+                <span>{result.date}</span>
+              </>
+            )}
+          </div>
+          
+          <p className="text-gray-700 text-sm">
+            {result.description}
+          </p>
         </div>
       </div>
     </div>
