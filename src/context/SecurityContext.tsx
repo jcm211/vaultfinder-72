@@ -29,7 +29,7 @@ interface SecurityContextType {
 
 const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
 
-export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const SecurityProvider = ({ children }: { children: React.ReactNode }) => {
   const [security, setSecurity] = useState<SecurityState>({
     malwareProtectionEnabled: true,
     intrusionDetectionEnabled: true,
@@ -39,8 +39,8 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     blockedAttempts: 0,
   });
 
+  // Load security settings from localStorage on initialization
   useEffect(() => {
-    // Load security settings from localStorage on initialization
     const savedSecurity = localStorage.getItem("securitySettings");
     if (savedSecurity) {
       try {
@@ -65,14 +65,20 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       };
       
       // Log the action
-      addSecurityLog(
-        updated.malwareProtectionEnabled ? 
-          "Malware protection enabled" : 
-          "Malware protection disabled",
-        "info"
-      );
+      const message = updated.malwareProtectionEnabled ? 
+        "Malware protection enabled" : 
+        "Malware protection disabled";
       
-      return updated;
+      const newLog = {
+        timestamp: new Date().toISOString(),
+        type: "info" as const,
+        message
+      };
+      
+      return {
+        ...updated,
+        securityLog: [newLog, ...updated.securityLog].slice(0, 100)
+      };
     });
   }, []);
 
@@ -85,14 +91,20 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       };
       
       // Log the action
-      addSecurityLog(
-        updated.intrusionDetectionEnabled ? 
-          "Intrusion detection enabled" : 
-          "Intrusion detection disabled",
-        "info"
-      );
+      const message = updated.intrusionDetectionEnabled ? 
+        "Intrusion detection enabled" : 
+        "Intrusion detection disabled";
       
-      return updated;
+      const newLog = {
+        timestamp: new Date().toISOString(),
+        type: "info" as const,
+        message
+      };
+      
+      return {
+        ...updated,
+        securityLog: [newLog, ...updated.securityLog].slice(0, 100)
+      };
     });
   }, []);
 

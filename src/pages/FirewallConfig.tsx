@@ -53,10 +53,11 @@ const FirewallConfig = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   // Redirect if not authenticated or not admin
-  if (!isAuthenticated || user?.role !== "admin") {
-    navigate("/login");
-    return null;
-  }
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== "admin") {
+      navigate("/login");
+    }
+  }, [isAuthenticated, user, navigate]);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -133,6 +134,11 @@ const FirewallConfig = () => {
       blockWords: settings.blockWords.filter(w => w !== word),
     });
   };
+  
+  // If not authenticated, return null
+  if (!isAuthenticated || user?.role !== "admin") {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">

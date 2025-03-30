@@ -98,6 +98,11 @@ const SecurityConfig = () => {
       default: return "text-green-500";
     }
   };
+  
+  // If not authenticated, return null
+  if (!isAuthenticated || user?.role !== "admin") {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
