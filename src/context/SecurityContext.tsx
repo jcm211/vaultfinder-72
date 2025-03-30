@@ -165,7 +165,7 @@ export const SecurityProvider = ({ children }: { children: React.ReactNode }) =>
     }
     
     return !foundThreats;
-  }, []);
+  }, [addSecurityLog]);
 
   // Check if a URL is safe
   const isUrlSafe = useCallback(async (url: string): Promise<boolean> => {
@@ -191,7 +191,7 @@ export const SecurityProvider = ({ children }: { children: React.ReactNode }) =>
     }
     
     return true;
-  }, [security.malwareProtectionEnabled]);
+  }, [security.malwareProtectionEnabled, addSecurityLog]);
 
   // Check if content is safe
   const isContentSafe = useCallback(async (content: string): Promise<boolean> => {
@@ -218,7 +218,7 @@ export const SecurityProvider = ({ children }: { children: React.ReactNode }) =>
     }
     
     return true;
-  }, [security.malwareProtectionEnabled]);
+  }, [security.malwareProtectionEnabled, addSecurityLog]);
 
   // Clear security logs
   const clearSecurityLogs = useCallback(() => {

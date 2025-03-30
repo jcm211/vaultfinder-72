@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 
 interface User {
@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (username: string, password: string): Promise<boolean> => {
     // Simulate API call delay
     await new Promise((resolve) => setTimeout(resolve, 800));
 
@@ -63,9 +63,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       variant: "destructive"
     });
     return false;
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem("user");
@@ -73,9 +73,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       title: "Logged out",
       description: "You have been successfully logged out."
     });
-  };
+  }, []);
 
-  const resetSystem = async (): Promise<boolean> => {
+  const resetSystem = useCallback(async (): Promise<boolean> => {
     // Simulate system reset
     await new Promise((resolve) => setTimeout(resolve, 1500));
     
@@ -130,7 +130,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       return false;
     }
-  };
+  }, []);
 
   return (
     <AuthContext.Provider
