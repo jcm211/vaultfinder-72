@@ -21,6 +21,10 @@ const NavBar = () => {
     navigate("/");
   };
 
+  // Determine if we should show the admin login button
+  // Only show login button if not authenticated (public users)
+  const showLoginButton = !isAuthenticated;
+
   return (
     <header className="w-full py-4 px-6 bg-white/80 backdrop-blur-lg border-b border-gray-100 sticky top-0 z-10">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -41,12 +45,16 @@ const NavBar = () => {
                   <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
                     <User className="h-4 w-4 text-gray-600" />
                   </div>
-                  <span className="font-medium text-sm">{user?.username}</span>
+                  <span className="font-medium text-sm">
+                    {user?.username}
+                    {user?.role === "ceo" && " (CEO)"}
+                    {user?.role === "admin" && " (Admin)"}
+                  </span>
                   <ChevronDown className="h-4 w-4 text-gray-500" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 py-2 animate-scale-in">
-                {user?.role === "admin" && (
+                {(user?.role === "admin" || user?.role === "ceo") && (
                   <>
                     <DropdownMenuItem
                       className="cursor-pointer"
@@ -79,7 +87,7 @@ const NavBar = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          ) : (
+          ) : showLoginButton ? (
             <Button 
               variant="ghost" 
               className="rounded-full px-4 py-2 text-primary hover:bg-primary/5"
@@ -88,7 +96,7 @@ const NavBar = () => {
               <User className="h-4 w-4 mr-2" />
               Login
             </Button>
-          )}
+          ) : null}
         </div>
       </div>
     </header>

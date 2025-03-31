@@ -38,13 +38,24 @@ const Admin = () => {
   const { toast } = useToast();
   const [isResetting, setIsResetting] = useState(false);
 
-  // Redirect if not authenticated or not admin
-  if (!isAuthenticated || user?.role !== "admin") {
+  // Redirect if not authenticated or not admin/CEO
+  if (!isAuthenticated || (user?.role !== "admin" && user?.role !== "ceo")) {
     navigate("/login");
     return null;
   }
 
+  const isCEO = user?.role === "ceo";
+
   const handleSystemReset = async () => {
+    if (!isCEO) {
+      toast({
+        title: "Access Denied",
+        description: "Only the CEO has permission to reset the system.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsResetting(true);
     try {
       const success = await resetSystem();
@@ -87,40 +98,44 @@ const Admin = () => {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8">
             <div>
-              <h1 className="text-2xl font-bold mb-2">Admin Control Panel</h1>
+              <h1 className="text-2xl font-bold mb-2">
+                {isCEO ? "CEO Control Panel" : "Admin Control Panel"}
+              </h1>
               <p className="text-gray-500">
                 Manage your search engine settings and security options
               </p>
             </div>
             
             <div className="mt-4 md:mt-0">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="space-x-2">
-                    <RotateCcw className="h-4 w-4" />
-                    <span>Reset System</span>
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="animate-scale-in">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will reset all settings to their default values, clear search history,
-                      and restore firewall configurations. This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleSystemReset}
-                      disabled={isResetting}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      {isResetting ? "Resetting..." : "Reset System"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              {isCEO && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="space-x-2">
+                      <RotateCcw className="h-4 w-4" />
+                      <span>Reset System</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="animate-scale-in">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will reset all settings to their default values, clear search history,
+                        and restore firewall configurations. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleSystemReset}
+                        disabled={isResetting}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {isResetting ? "Resetting..." : "Reset System"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           </div>
           
@@ -204,33 +219,44 @@ const Admin = () => {
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" className="w-full justify-between">
-                          <span>Reset System</span>
-                          <RotateCcw className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will reset all settings to their default values, clear search history,
-                            and restore firewall configurations. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={handleSystemReset}
-                            disabled={isResetting}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            {isResetting ? "Resetting..." : "Reset System"}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    {isCEO ? (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            <span>Reset System</span>
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will reset all settings to their default values, clear search history,
+                              and restore firewall configurations. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={handleSystemReset}
+                              disabled={isResetting}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              {isResetting ? "Resetting..." : "Reset System"}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-between opacity-50"
+                        disabled={true}
+                      >
+                        <span>Reset System (CEO Only)</span>
+                        <Lock className="h-4 w-4" />
+                      </Button>
+                    )}
                   </CardFooter>
                 </Card>
               </div>
@@ -267,11 +293,27 @@ const Admin = () => {
                         <div>
                           <h4 className="text-sm font-medium text-blue-800">Admin Access Secured</h4>
                           <p className="text-xs text-blue-600 mt-1">
-                            Your admin panel is secured with password protection.
+                            Your admin panel is secured with 2-factor authentication.
                           </p>
                         </div>
                       </div>
                     </div>
+
+                    {isCEO && (
+                      <div className="p-4 bg-purple-50 border border-purple-100 rounded-lg">
+                        <div className="flex items-start">
+                          <div className="h-6 w-6 rounded-full bg-purple-100 flex items-center justify-center mr-3 mt-0.5">
+                            <Shield className="h-3 w-3 text-purple-600" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium text-purple-800">CEO Access Granted</h4>
+                            <p className="text-xs text-purple-600 mt-1">
+                              You have exclusive access to system reset and critical security functions.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

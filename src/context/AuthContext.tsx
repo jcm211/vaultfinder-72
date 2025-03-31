@@ -2,17 +2,24 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 
+// Define the possible user roles
+type UserRole = "admin" | "user" | "ceo";
+
 interface User {
   username: string;
-  role: "admin" | "user";
+  role: UserRole;
+  faceId?: string; // Store face recognition data
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<{ success: boolean; requiresSecondFactor?: boolean }>;
   logout: () => void;
   resetSystem: () => Promise<boolean>;
+  verifyFace: (faceData: string) => Promise<boolean>;
+  hasPendingVerification: boolean;
+  pendingUser: User | null;
 }
 
 const defaultAdminCredentials = {
@@ -20,11 +27,40 @@ const defaultAdminCredentials = {
   password: "JC222@Vemous$24",
 };
 
+const defaultCeoCredentials = {
+  username: "CEO",
+  password: "SystemReset@2024!",
+};
+
+// Mock user database with face recognition data
+const userDatabase = [
+  { 
+    username: defaultAdminCredentials.username, 
+    password: defaultAdminCredentials.password, 
+    role: "admin" as UserRole,
+    faceId: "admin-face-recognition-hash" 
+  },
+  { 
+    username: defaultCeoCredentials.username, 
+    password: defaultCeoCredentials.password, 
+    role: "ceo" as UserRole,
+    faceId: "ceo-face-recognition-hash" 
+  },
+  { 
+    username: "user1", 
+    password: "password123", 
+    role: "user" as UserRole,
+    faceId: "user1-face-recognition-hash" 
+  }
+];
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasPendingVerification, setHasPendingVerification] = useState(false);
+  const [pendingUser, setPendingUser] = useState<User | null>(null);
 
   useEffect(() => {
     // Check if user is stored in localStorage
@@ -41,20 +77,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  const login = useCallback(async (username: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (username: string, password: string): Promise<{ success: boolean; requiresSecondFactor?: boolean }> => {
     // Simulate API call delay
     await new Promise((resolve) => setTimeout(resolve, 800));
 
-    if (username === defaultAdminCredentials.username && password === defaultAdminCredentials.password) {
-      const user = { username, role: "admin" as const };
-      setUser(user);
-      setIsAuthenticated(true);
-      localStorage.setItem("user", JSON.stringify(user));
+    // Find user in our mock database
+    const foundUser = userDatabase.find(
+      (u) => u.username === username && u.password === password
+    );
+
+    if (foundUser) {
+      // For 2FA, we don't complete the authentication process yet
+      const userInfo = { 
+        username: foundUser.username, 
+        role: foundUser.role
+      };
+      
+      setPendingUser(userInfo);
+      setHasPendingVerification(true);
+      
       toast({
-        title: "Login successful",
-        description: "Welcome back, administrator."
+        title: "First factor verified",
+        description: "Please complete face verification to continue."
       });
-      return true;
+      
+      return { success: true, requiresSecondFactor: true };
     }
 
     toast({
@@ -62,12 +109,61 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       description: "Invalid username or password. Please try again.",
       variant: "destructive"
     });
-    return false;
+    return { success: false };
   }, []);
+  
+  const verifyFace = useCallback(async (faceData: string): Promise<boolean> => {
+    // Simulate API call delay
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    
+    if (!pendingUser) {
+      toast({
+        title: "Verification error",
+        description: "No pending user authentication found.",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    // In a real app, we would compare the faceData with the stored faceId
+    // For this demo, we'll simulate a successful verification
+    const foundUser = userDatabase.find(u => u.username === pendingUser.username);
+    
+    if (foundUser) {
+      const user = { 
+        username: foundUser.username, 
+        role: foundUser.role 
+      };
+      
+      setUser(user);
+      setIsAuthenticated(true);
+      setHasPendingVerification(false);
+      setPendingUser(null);
+      
+      localStorage.setItem("user", JSON.stringify(user));
+      
+      toast({
+        title: "Login successful",
+        description: `Welcome back, ${user.role === "ceo" ? "CEO" : user.role === "admin" ? "administrator" : "user"}.`
+      });
+      
+      return true;
+    }
+    
+    toast({
+      title: "Face verification failed",
+      description: "We couldn't verify your identity. Please try again.",
+      variant: "destructive"
+    });
+    
+    return false;
+  }, [pendingUser]);
 
   const logout = useCallback(() => {
     setUser(null);
     setIsAuthenticated(false);
+    setHasPendingVerification(false);
+    setPendingUser(null);
     localStorage.removeItem("user");
     toast({
       title: "Logged out",
@@ -76,6 +172,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const resetSystem = useCallback(async (): Promise<boolean> => {
+    // Only CEO can reset the system
+    if (!user || user.role !== "ceo") {
+      toast({
+        title: "Access Denied",
+        description: "Only the CEO can reset the system.",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
     // Simulate system reset
     await new Promise((resolve) => setTimeout(resolve, 1500));
     
@@ -130,7 +236,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       return false;
     }
-  }, []);
+  }, [user]);
 
   return (
     <AuthContext.Provider
@@ -140,6 +246,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         login,
         logout,
         resetSystem,
+        verifyFace,
+        hasPendingVerification,
+        pendingUser
       }}
     >
       {children}
