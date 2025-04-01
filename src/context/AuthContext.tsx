@@ -19,11 +19,9 @@ interface AuthContextType {
   logout: () => void;
   resetSystem: () => Promise<boolean>;
   verifyFace: (faceData: string) => Promise<boolean>;
-  verifyPhone: (phoneNumber: string, code: string) => Promise<boolean>;
-  sendVerificationCode: (phoneNumber: string) => Promise<boolean>;
   hasPendingVerification: boolean;
   pendingUser: User | null;
-  verificationStep: "password" | "face" | "phone" | "complete";
+  verificationStep: "password" | "face" | "complete";
 }
 
 const defaultAdminCredentials = {
@@ -61,9 +59,6 @@ const userDatabase = [
   }
 ];
 
-// Store verification codes (in a real app this would be handled securely on the backend)
-const verificationCodes: Record<string, string> = {};
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -71,7 +66,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasPendingVerification, setHasPendingVerification] = useState(false);
   const [pendingUser, setPendingUser] = useState<User | null>(null);
-  const [verificationStep, setVerificationStep] = useState<"password" | "face" | "phone" | "complete">("password");
+  const [verificationStep, setVerificationStep] = useState<"password" | "face" | "complete">("password");
 
   useEffect(() => {
     // Check if user is stored in localStorage
@@ -144,12 +139,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const foundUser = userDatabase.find(u => u.username === pendingUser.username);
     
     if (foundUser) {
-      // After face verification, move to phone verification
-      setVerificationStep("phone");
+      // After successful face verification, complete the login process
+      const user = { 
+        username: foundUser.username, 
+        role: foundUser.role,
+        phoneNumber: foundUser.phoneNumber
+      };
+      
+      setUser(user);
+      setIsAuthenticated(true);
+      setHasPendingVerification(false);
+      setPendingUser(null);
+      setVerificationStep("complete");
+      
+      localStorage.setItem("user", JSON.stringify(user));
       
       toast({
-        title: "Face verification successful",
-        description: "Please verify your phone number to complete login."
+        title: "Login successful",
+        description: `Welcome back, ${user.role === "ceo" ? "CEO" : user.role === "admin" ? "administrator" : "user"}.`
       });
       
       return true;
@@ -158,98 +165,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     toast({
       title: "Face verification failed",
       description: "We couldn't verify your identity. Please try again.",
-      variant: "destructive"
-    });
-    
-    return false;
-  }, [pendingUser]);
-
-  const sendVerificationCode = useCallback(async (phoneNumber: string): Promise<boolean> => {
-    // Simulate API call to send SMS
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    
-    if (!pendingUser) {
-      toast({
-        title: "Verification error",
-        description: "No pending user authentication found.",
-        variant: "destructive"
-      });
-      return false;
-    }
-    
-    try {
-      // Generate a random 6-digit code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      // In a real app, this would be sent via SMS
-      console.log(`Verification code for ${phoneNumber}: ${code}`);
-      
-      // Store the code for verification (in a real app this would be on the server)
-      verificationCodes[phoneNumber] = code;
-      
-      toast({
-        title: "Verification code sent",
-        description: `A 6-digit code has been sent to ${phoneNumber}.`
-      });
-      
-      return true;
-    } catch (error) {
-      console.error("Error sending verification code:", error);
-      toast({
-        title: "Failed to send code",
-        description: "We couldn't send a verification code. Please try again.",
-        variant: "destructive"
-      });
-      return false;
-    }
-  }, [pendingUser]);
-
-  const verifyPhone = useCallback(async (phoneNumber: string, code: string): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    if (!pendingUser) {
-      toast({
-        title: "Verification error",
-        description: "No pending user authentication found.",
-        variant: "destructive"
-      });
-      return false;
-    }
-    
-    // Verify the code (in a real app this would be checked securely on the backend)
-    // For demo purposes, any code is accepted if the correct number of digits
-    const isValid = code.length === 6 && code === verificationCodes[phoneNumber];
-    
-    if (isValid) {
-      const foundUser = userDatabase.find(u => u.username === pendingUser.username);
-      
-      if (foundUser) {
-        const user = { 
-          username: foundUser.username, 
-          role: foundUser.role,
-          phoneNumber: foundUser.phoneNumber
-        };
-        
-        setUser(user);
-        setIsAuthenticated(true);
-        setHasPendingVerification(false);
-        setPendingUser(null);
-        setVerificationStep("complete");
-        
-        localStorage.setItem("user", JSON.stringify(user));
-        
-        toast({
-          title: "Login successful",
-          description: `Welcome back, ${user.role === "ceo" ? "CEO" : user.role === "admin" ? "administrator" : "user"}.`
-        });
-        
-        return true;
-      }
-    }
-    
-    toast({
-      title: "Phone verification failed",
-      description: "Invalid verification code. Please try again.",
       variant: "destructive"
     });
     
@@ -345,8 +260,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         logout,
         resetSystem,
         verifyFace,
-        verifyPhone,
-        sendVerificationCode,
         hasPendingVerification,
         pendingUser,
         verificationStep

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Eye, EyeOff, Camera, User, X, Phone, CheckCircle2 } from "lucide-react";
+import { Shield, Eye, EyeOff, Camera, User, X } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -15,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const Login = () => {
   const [username, setUsername] = useState("");
@@ -25,19 +24,12 @@ const Login = () => {
   const [faceCapture, setFaceCapture] = useState<string | null>(null);
   const [isFaceVerifying, setIsFaceVerifying] = useState(false);
   const [isCapturingFace, setIsCapturingFace] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [isSendingCode, setIsSendingCode] = useState(false);
-  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
-  const [otpValue, setOtpValue] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const { 
     login, 
-    verifyFace, 
-    verifyPhone,
-    sendVerificationCode,
+    verifyFace,
     isAuthenticated, 
     user, 
     hasPendingVerification, 
@@ -89,13 +81,6 @@ const Login = () => {
       }
     };
   }, [isCapturingFace, toast]);
-
-  // Pre-fill phone number if available from pendingUser
-  useEffect(() => {
-    if (pendingUser?.phoneNumber && !phoneNumber) {
-      setPhoneNumber(pendingUser.phoneNumber);
-    }
-  }, [pendingUser, phoneNumber]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,6 +160,7 @@ const Login = () => {
       // In a real app, we would send the face data to a server for processing
       await verifyFace(faceCapture);
       // Verification step change is handled in the AuthContext
+      // After successful verification, the useEffect will handle redirection
     } catch (error) {
       toast({
         title: "Verification Error",
@@ -183,62 +169,6 @@ const Login = () => {
       });
     } finally {
       setIsFaceVerifying(false);
-    }
-  };
-
-  const handleSendCode = async () => {
-    if (!phoneNumber || phoneNumber.length < 10) {
-      toast({
-        title: "Invalid Phone Number",
-        description: "Please enter a valid phone number.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsSendingCode(true);
-    
-    try {
-      const success = await sendVerificationCode(phoneNumber);
-      if (success) {
-        setCodeSent(true);
-        // Focus on the OTP input
-        document.getElementById('otp-input')?.focus();
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to send verification code.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSendingCode(false);
-    }
-  };
-
-  const handleVerifyPhone = async () => {
-    if (!phoneNumber || otpValue.length !== 6) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter a valid phone number and verification code.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsVerifyingCode(true);
-    
-    try {
-      const success = await verifyPhone(phoneNumber, otpValue);
-      // If successful, useEffect will handle redirection
-    } catch (error) {
-      toast({
-        title: "Verification Error",
-        description: "An unexpected error occurred during phone verification.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsVerifyingCode(false);
     }
   };
 
@@ -323,97 +253,6 @@ const Login = () => {
               onClick={() => {
                 setFaceCapture(null);
                 setIsCapturingFace(false);
-                window.location.href = "/login";
-              }}
-              className="w-full"
-            >
-              Cancel
-            </Button>
-          </CardFooter>
-        </Card>
-      );
-    } else if (verificationStep === "phone") {
-      return (
-        <Card className="w-full max-w-md overflow-hidden animate-scale-in">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">Phone Verification</CardTitle>
-            <CardDescription>
-              Enter your phone number to receive a verification code
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="space-y-6">
-            <div className="space-y-3">
-              <Label htmlFor="phoneNumber">Phone Number</Label>
-              <div className="flex space-x-2">
-                <Input
-                  id="phoneNumber"
-                  type="tel"
-                  placeholder="+1 (555) 555-5555"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="flex-1"
-                  disabled={codeSent}
-                />
-                <Button 
-                  onClick={handleSendCode} 
-                  disabled={isSendingCode || (!phoneNumber || phoneNumber.length < 10) || codeSent}
-                  variant={codeSent ? "outline" : "default"}
-                  className="whitespace-nowrap"
-                >
-                  {codeSent ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 mr-1" /> Sent
-                    </>
-                  ) : isSendingCode ? (
-                    "Sending..."
-                  ) : (
-                    <>
-                      <Phone className="h-4 w-4 mr-1" /> Send Code
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="otp-input">Verification Code</Label>
-              <InputOTP 
-                id="otp-input"
-                maxLength={6} 
-                value={otpValue} 
-                onChange={setOtpValue}
-                containerClassName="justify-center"
-              >
-                <InputOTPGroup>
-                  <InputOTPSlot index={0} />
-                  <InputOTPSlot index={1} />
-                  <InputOTPSlot index={2} />
-                  <InputOTPSlot index={3} />
-                  <InputOTPSlot index={4} />
-                  <InputOTPSlot index={5} />
-                </InputOTPGroup>
-              </InputOTP>
-              <p className="text-xs text-center text-gray-500 mt-1">
-                Enter the 6-digit code sent to your phone
-              </p>
-            </div>
-          </CardContent>
-          
-          <CardFooter className="flex flex-col space-y-4">
-            <Button 
-              onClick={handleVerifyPhone}
-              className="w-full"
-              disabled={!codeSent || otpValue.length < 6 || isVerifyingCode}
-            >
-              {isVerifyingCode ? "Verifying..." : "Complete Login"}
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setCodeSent(false);
-                setOtpValue("");
                 window.location.href = "/login";
               }}
               className="w-full"
