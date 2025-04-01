@@ -9,6 +9,7 @@ interface User {
   username: string;
   role: UserRole;
   faceId?: string; // Store face recognition data
+  phoneNumber?: string; // Store user's phone number
 }
 
 interface AuthContextType {
@@ -18,8 +19,11 @@ interface AuthContextType {
   logout: () => void;
   resetSystem: () => Promise<boolean>;
   verifyFace: (faceData: string) => Promise<boolean>;
+  verifyPhone: (phoneNumber: string, code: string) => Promise<boolean>;
+  sendVerificationCode: (phoneNumber: string) => Promise<boolean>;
   hasPendingVerification: boolean;
   pendingUser: User | null;
+  verificationStep: "password" | "face" | "phone" | "complete";
 }
 
 const defaultAdminCredentials = {
@@ -32,27 +36,33 @@ const defaultCeoCredentials = {
   password: "SystemReset@2024!",
 };
 
-// Mock user database with face recognition data
+// Mock user database with face recognition data and phone numbers
 const userDatabase = [
   { 
     username: defaultAdminCredentials.username, 
     password: defaultAdminCredentials.password, 
     role: "admin" as UserRole,
-    faceId: "admin-face-recognition-hash" 
+    faceId: "admin-face-recognition-hash",
+    phoneNumber: "+1234567890" 
   },
   { 
     username: defaultCeoCredentials.username, 
     password: defaultCeoCredentials.password, 
     role: "ceo" as UserRole,
-    faceId: "ceo-face-recognition-hash" 
+    faceId: "ceo-face-recognition-hash",
+    phoneNumber: "+9876543210"
   },
   { 
     username: "user1", 
     password: "password123", 
     role: "user" as UserRole,
-    faceId: "user1-face-recognition-hash" 
+    faceId: "user1-face-recognition-hash",
+    phoneNumber: "+1122334455"
   }
 ];
+
+// Store verification codes (in a real app this would be handled securely on the backend)
+const verificationCodes: Record<string, string> = {};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -61,6 +71,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasPendingVerification, setHasPendingVerification] = useState(false);
   const [pendingUser, setPendingUser] = useState<User | null>(null);
+  const [verificationStep, setVerificationStep] = useState<"password" | "face" | "phone" | "complete">("password");
 
   useEffect(() => {
     // Check if user is stored in localStorage
@@ -70,6 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
         setIsAuthenticated(true);
+        setVerificationStep("complete");
       } catch (error) {
         console.error("Failed to parse stored user:", error);
         localStorage.removeItem("user");
@@ -87,14 +99,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     if (foundUser) {
-      // For 2FA, we don't complete the authentication process yet
+      // For multi-factor auth, we don't complete the authentication process yet
       const userInfo = { 
         username: foundUser.username, 
-        role: foundUser.role
+        role: foundUser.role,
+        phoneNumber: foundUser.phoneNumber
       };
       
       setPendingUser(userInfo);
       setHasPendingVerification(true);
+      setVerificationStep("face");
       
       toast({
         title: "First factor verified",
@@ -130,21 +144,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const foundUser = userDatabase.find(u => u.username === pendingUser.username);
     
     if (foundUser) {
-      const user = { 
-        username: foundUser.username, 
-        role: foundUser.role 
-      };
-      
-      setUser(user);
-      setIsAuthenticated(true);
-      setHasPendingVerification(false);
-      setPendingUser(null);
-      
-      localStorage.setItem("user", JSON.stringify(user));
+      // After face verification, move to phone verification
+      setVerificationStep("phone");
       
       toast({
-        title: "Login successful",
-        description: `Welcome back, ${user.role === "ceo" ? "CEO" : user.role === "admin" ? "administrator" : "user"}.`
+        title: "Face verification successful",
+        description: "Please verify your phone number to complete login."
       });
       
       return true;
@@ -159,11 +164,104 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return false;
   }, [pendingUser]);
 
+  const sendVerificationCode = useCallback(async (phoneNumber: string): Promise<boolean> => {
+    // Simulate API call to send SMS
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    
+    if (!pendingUser) {
+      toast({
+        title: "Verification error",
+        description: "No pending user authentication found.",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    try {
+      // Generate a random 6-digit code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      // In a real app, this would be sent via SMS
+      console.log(`Verification code for ${phoneNumber}: ${code}`);
+      
+      // Store the code for verification (in a real app this would be on the server)
+      verificationCodes[phoneNumber] = code;
+      
+      toast({
+        title: "Verification code sent",
+        description: `A 6-digit code has been sent to ${phoneNumber}.`
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Error sending verification code:", error);
+      toast({
+        title: "Failed to send code",
+        description: "We couldn't send a verification code. Please try again.",
+        variant: "destructive"
+      });
+      return false;
+    }
+  }, [pendingUser]);
+
+  const verifyPhone = useCallback(async (phoneNumber: string, code: string): Promise<boolean> => {
+    // Simulate API call delay
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    
+    if (!pendingUser) {
+      toast({
+        title: "Verification error",
+        description: "No pending user authentication found.",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    // Verify the code (in a real app this would be checked securely on the backend)
+    // For demo purposes, any code is accepted if the correct number of digits
+    const isValid = code.length === 6 && code === verificationCodes[phoneNumber];
+    
+    if (isValid) {
+      const foundUser = userDatabase.find(u => u.username === pendingUser.username);
+      
+      if (foundUser) {
+        const user = { 
+          username: foundUser.username, 
+          role: foundUser.role,
+          phoneNumber: foundUser.phoneNumber
+        };
+        
+        setUser(user);
+        setIsAuthenticated(true);
+        setHasPendingVerification(false);
+        setPendingUser(null);
+        setVerificationStep("complete");
+        
+        localStorage.setItem("user", JSON.stringify(user));
+        
+        toast({
+          title: "Login successful",
+          description: `Welcome back, ${user.role === "ceo" ? "CEO" : user.role === "admin" ? "administrator" : "user"}.`
+        });
+        
+        return true;
+      }
+    }
+    
+    toast({
+      title: "Phone verification failed",
+      description: "Invalid verification code. Please try again.",
+      variant: "destructive"
+    });
+    
+    return false;
+  }, [pendingUser]);
+
   const logout = useCallback(() => {
     setUser(null);
     setIsAuthenticated(false);
     setHasPendingVerification(false);
     setPendingUser(null);
+    setVerificationStep("password");
     localStorage.removeItem("user");
     toast({
       title: "Logged out",
@@ -247,8 +345,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         logout,
         resetSystem,
         verifyFace,
+        verifyPhone,
+        sendVerificationCode,
         hasPendingVerification,
-        pendingUser
+        pendingUser,
+        verificationStep
       }}
     >
       {children}

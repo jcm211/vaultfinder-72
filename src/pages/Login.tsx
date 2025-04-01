@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Eye, EyeOff, Camera, User, X } from "lucide-react";
+import { Shield, Eye, EyeOff, Camera, User, X, Phone, CheckCircle2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -25,11 +25,25 @@ const Login = () => {
   const [faceCapture, setFaceCapture] = useState<string | null>(null);
   const [isFaceVerifying, setIsFaceVerifying] = useState(false);
   const [isCapturingFace, setIsCapturingFace] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [otpValue, setOtpValue] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  const { login, verifyFace, isAuthenticated, user, hasPendingVerification, pendingUser } = useAuth();
+  const { 
+    login, 
+    verifyFace, 
+    verifyPhone,
+    sendVerificationCode,
+    isAuthenticated, 
+    user, 
+    hasPendingVerification, 
+    pendingUser,
+    verificationStep
+  } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -75,6 +89,13 @@ const Login = () => {
       }
     };
   }, [isCapturingFace, toast]);
+
+  // Pre-fill phone number if available from pendingUser
+  useEffect(() => {
+    if (pendingUser?.phoneNumber && !phoneNumber) {
+      setPhoneNumber(pendingUser.phoneNumber);
+    }
+  }, [pendingUser, phoneNumber]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,11 +173,8 @@ const Login = () => {
     
     try {
       // In a real app, we would send the face data to a server for processing
-      const success = await verifyFace(faceCapture);
-      
-      if (success) {
-        // Redirect handled by the useEffect above when isAuthenticated changes
-      }
+      await verifyFace(faceCapture);
+      // Verification step change is handled in the AuthContext
     } catch (error) {
       toast({
         title: "Verification Error",
@@ -168,15 +186,71 @@ const Login = () => {
     }
   };
 
+  const handleSendCode = async () => {
+    if (!phoneNumber || phoneNumber.length < 10) {
+      toast({
+        title: "Invalid Phone Number",
+        description: "Please enter a valid phone number.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsSendingCode(true);
+    
+    try {
+      const success = await sendVerificationCode(phoneNumber);
+      if (success) {
+        setCodeSent(true);
+        // Focus on the OTP input
+        document.getElementById('otp-input')?.focus();
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send verification code.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const handleVerifyPhone = async () => {
+    if (!phoneNumber || otpValue.length !== 6) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a valid phone number and verification code.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsVerifyingCode(true);
+    
+    try {
+      const success = await verifyPhone(phoneNumber, otpValue);
+      // If successful, useEffect will handle redirection
+    } catch (error) {
+      toast({
+        title: "Verification Error",
+        description: "An unexpected error occurred during phone verification.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
+
   const resetFaceCapture = () => {
     setFaceCapture(null);
     setIsCapturingFace(false);
   };
 
-  // Render face capture screen when waiting for second factor
-  if (hasPendingVerification) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50 px-4">
+  // Render the appropriate verification step based on the current verification step
+  const renderVerificationStep = () => {
+    if (verificationStep === "face") {
+      return (
         <Card className="w-full max-w-md overflow-hidden animate-scale-in">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold">Face Verification</CardTitle>
@@ -233,11 +307,79 @@ const Login = () => {
             
             {/* Hidden canvas for capturing frames */}
             <canvas ref={canvasRef} className="hidden" />
+          </CardContent>
+          
+          <CardFooter className="flex flex-col space-y-4">
+            <Button 
+              onClick={handleVerifyFace}
+              className="w-full"
+              disabled={!faceCapture || isFaceVerifying}
+            >
+              {isFaceVerifying ? "Verifying..." : "Verify Identity"}
+            </Button>
             
-            {/* OTP Input for additional verification */}
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setFaceCapture(null);
+                setIsCapturingFace(false);
+                window.location.href = "/login";
+              }}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+          </CardFooter>
+        </Card>
+      );
+    } else if (verificationStep === "phone") {
+      return (
+        <Card className="w-full max-w-md overflow-hidden animate-scale-in">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Phone Verification</CardTitle>
+            <CardDescription>
+              Enter your phone number to receive a verification code
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent className="space-y-6">
+            <div className="space-y-3">
+              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <div className="flex space-x-2">
+                <Input
+                  id="phoneNumber"
+                  type="tel"
+                  placeholder="+1 (555) 555-5555"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="flex-1"
+                  disabled={codeSent}
+                />
+                <Button 
+                  onClick={handleSendCode} 
+                  disabled={isSendingCode || (!phoneNumber || phoneNumber.length < 10) || codeSent}
+                  variant={codeSent ? "outline" : "default"}
+                  className="whitespace-nowrap"
+                >
+                  {codeSent ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-1" /> Sent
+                    </>
+                  ) : isSendingCode ? (
+                    "Sending..."
+                  ) : (
+                    <>
+                      <Phone className="h-4 w-4 mr-1" /> Send Code
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+            
             <div className="space-y-2">
-              <Label htmlFor="otp">Verification Code</Label>
+              <Label htmlFor="otp-input">Verification Code</Label>
               <InputOTP 
+                id="otp-input"
                 maxLength={6} 
                 value={otpValue} 
                 onChange={setOtpValue}
@@ -253,25 +395,24 @@ const Login = () => {
                 </InputOTPGroup>
               </InputOTP>
               <p className="text-xs text-center text-gray-500 mt-1">
-                Enter the 6-digit code sent to your device
+                Enter the 6-digit code sent to your phone
               </p>
             </div>
           </CardContent>
           
           <CardFooter className="flex flex-col space-y-4">
             <Button 
-              onClick={handleVerifyFace}
+              onClick={handleVerifyPhone}
               className="w-full"
-              disabled={!faceCapture || otpValue.length < 6 || isFaceVerifying}
+              disabled={!codeSent || otpValue.length < 6 || isVerifyingCode}
             >
-              {isFaceVerifying ? "Verifying..." : "Verify Identity"}
+              {isVerifyingCode ? "Verifying..." : "Complete Login"}
             </Button>
             
             <Button 
               variant="outline" 
               onClick={() => {
-                setFaceCapture(null);
-                setIsCapturingFace(false);
+                setCodeSent(false);
                 setOtpValue("");
                 window.location.href = "/login";
               }}
@@ -281,13 +422,11 @@ const Login = () => {
             </Button>
           </CardFooter>
         </Card>
-      </div>
-    );
-  }
-
-  // Render regular login form
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50 px-4">
+      );
+    }
+    
+    // Default to password step (initial login)
+    return (
       <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden animate-scale-in">
         <div className="p-8">
           <div className="flex justify-center mb-6">
@@ -360,6 +499,13 @@ const Login = () => {
           </p>
         </div>
       </div>
+    );
+  };
+
+  // Main render
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50 px-4">
+      {hasPendingVerification ? renderVerificationStep() : renderVerificationStep()}
     </div>
   );
 };

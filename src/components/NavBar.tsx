@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Shield, LogOut, Settings, User, ChevronDown } from "lucide-react";
+import { Shield, LogOut, Settings, User, ChevronDown, Phone } from "lucide-react";
 
 const NavBar = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -54,6 +54,12 @@ const NavBar = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 py-2 animate-scale-in">
+                {user?.phoneNumber && (
+                  <DropdownMenuItem className="cursor-default opacity-75">
+                    <Phone className="h-4 w-4 mr-2" />
+                    {user.phoneNumber}
+                  </DropdownMenuItem>
+                )}
                 {(user?.role === "admin" || user?.role === "ceo") && (
                   <>
                     <DropdownMenuItem
